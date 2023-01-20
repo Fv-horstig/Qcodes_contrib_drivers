@@ -1,0 +1,82 @@
+from qcodes.instrument.base import Instrument
+from qcodes.utils import validators as vals
+import numpy as np
+from urllib.request import urlopen
+import sys
+
+###### Example code on initialising Instrument ######
+# import VarAtt_driver
+# VarAtt = VarAtt_driver.VAR_ATT(name="VarAtt",address = "192.168.150.64") # IP address needs to match that defined using GUI
+# VarAtt.Attenuation() # used to set or get Attenuation
+
+class VAR_ATT(Instrument):
+    """
+    qcodes driver for the MiniCircuits Variable attenuator - Works for single channel Attenuators like the RCDAT-6000-30
+
+    Written by Felix von Horstig
+
+    TO DO:
+    - Code for multi-channel Attenuators
+    - Getting/Setting of Attenuator IP Address
+    - Integration of USB connectivity
+
+    """
+    def __init__(self,name:str,address:str):
+
+        super().__init__(name=name)        
+        
+
+
+        self.add_parameter(
+            "Attenuation",
+            unit="dB",
+            label="Attenuation",
+            vals=vals.Numbers(0, 30),
+            get_cmd=self.VarAtt_getAtt,
+            set_cmd=self.VarAtt_setAtt,
+        )
+
+        self.add_parameter(
+            "Address",
+            get_cmd=None,
+            set_cmd=None,
+            label="Address",
+        )
+
+        self.initialise(address)
+        self.connect_message()
+
+    def initialise(self,address):
+        self.Address(address)
+        self.VarAtt_setAtt(self.VarAtt_getAtt())
+        
+        return
+    
+    def VarAtt_getAtt(self):
+        return float(Get_HTTP_Result(self.Address(),"ATT?"))
+
+    def VarAtt_setAtt(self,Attset):
+        return Get_HTTP_Result(self.Address(),"SETATT="+str(Attset))
+
+
+
+def Get_HTTP_Result(address,CmdToSend): # This passes commands to the instrument via an ethernet connection
+
+    # Specify the IP address
+    CmdToSend = "http://"+address+"/:" + CmdToSend
+
+    # Send the HTTP command and try to read the result
+    try:
+        HTTP_Result = urlopen(CmdToSend, timeout=2)
+        PTE_Return = HTTP_Result.read()
+
+    # Catch an exception if URL is incorrect (incorrect IP or disconnected)
+    except:
+        print ("Error, no response from device; check IP address and connections.")
+        PTE_Return = "No Response!"
+        sys.exit()      # Exit the script
+
+    # Return the response
+    return PTE_Return
+
+
